@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タスクマトリクス</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --border: #e0ddd6;
+    --border-light: #ece9e2;
+    --text: #2a2825;
+    --text-muted: #8a877f;
+    --text-hint: #b5b2aa;
+    --accent1: #4a7c6f;
+    --accent2: #7a6a9a;
+    --accent3: #c17f3a;
+    --accent4: #8a5a5a;
+    --done-line: #b5b2aa;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px 16px 40px;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+
+  /* Axis labels */
+  .h-axis {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .axis-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .axis-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    position: relative;
+  }
+
+  .axis-line.right::after {
+    content: '';
+    position: absolute;
+    right: -1px; top: -3px;
+    border: 3px solid transparent;
+    border-left: 5px solid var(--border);
+  }
+
+  .axis-line.left::before {
+    content: '';
+    position: absolute;
+    left: -1px; top: -3px;
+    border: 3px solid transparent;
+    border-right: 5px solid var(--border);
+  }
+
+  .layout {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+
+  .v-axis-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 16px;
+    flex-shrink: 0;
+    padding: 2px 0;
+  }
+
+  .v-axis-line {
+    flex: 1;
+    width: 1px;
+    background: var(--border);
+    position: relative;
+    margin: 2px 0;
+  }
+
+  .v-axis-line::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -3px;
+    border: 3px solid transparent;
+    border-bottom: 5px solid var(--border);
+  }
+
+  .v-axis-line::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: -3px;
+    border: 3px solid transparent;
+    border-top: 5px solid var(--border);
+  }
+
+  .v-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 500;
+    writing-mode: vertical-rl;
+    white-space: nowrap;
+  }
+
+  .matrix {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    min-height: 460px;
+  }
+
+  .zone {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+  }
+
+  .zone:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+
+  .zone-z1 { border-top: 3px solid var(--accent1); }
+  .zone-z2 { border-top: 3px solid var(--accent2); }
+  .zone-z3 { border-top: 3px solid var(--accent3); }
+  .zone-z4 { border-top: 3px solid var(--accent4); }
+
+  .zone-header { flex-shrink: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border-light); }
+
+  .zone-num {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .zone-z1 .zone-num { color: var(--accent1); }
+  .zone-z2 .zone-num { color: var(--accent2); }
+  .zone-z3 .zone-num { color: var(--accent3); }
+  .zone-z4 .zone-num { color: var(--accent4); }
+
+  .zone-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+
+  .items {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .items::-webkit-scrollbar { width: 3px; }
+  .items::-webkit-scrollbar-track { background: transparent; }
+  .items::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .memo-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 5px 7px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+    animation: fadeIn 0.15s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+  .memo-check {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: 1px;
+    accent-color: var(--text-muted);
+  }
+
+  .memo-text {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+
+  .memo-text.done {
+    text-decoration: line-through;
+    color: var(--done-line);
+  }
+
+  .memo-del {
+    font-size: 14px;
+    color: var(--text-hint);
+    cursor: pointer;
+    padding: 0 1px;
+    flex-shrink: 0;
+    line-height: 1.2;
+    transition: color 0.15s;
+  }
+
+  .memo-del:hover { color: #c17f7f; }
+
+  .add-row {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .add-input {
+    flex: 1;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 5px 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    min-width: 0;
+    transition: border-color 0.15s;
+  }
+
+  .add-input:focus {
+    outline: none;
+    border-color: var(--text-muted);
+  }
+
+  .add-input::placeholder { color: var(--text-hint); }
+
+  .add-btn {
+    font-size: 16px;
+    font-weight: 400;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .add-btn:hover { background: var(--border-light); color: var(--text); }
+
+  /* Deposit box */
+  .deposit-box {
+    margin-top: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 3px solid #6b8fb5;
+    border-radius: var(--radius);
+    padding: 12px;
+  }
+
+  .deposit-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #6b8fb5;
+    letter-spacing: 0.03em;
+  }
+
+  .deposit-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    margin-top: 2px;
+  }
+
+  .deposit-items {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .deposit-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+    animation: fadeIn 0.15s ease;
+  }
+
+  .deposit-add {
+    display: flex;
+    gap: 6px;
+  }
+
+  .deposit-input {
+    flex: 1;
+    font-size: 12px;
+    font-family: inherit;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+
+  .deposit-input:focus { outline: none; border-color: var(--text-muted); }
+  .deposit-input::placeholder { color: var(--text-hint); }
+
+  .deposit-add-btn {
+    font-size: 12px;
+    font-family: inherit;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+
+  .deposit-add-btn:hover { background: var(--border-light); color: var(--text); }
+
+  .empty-hint {
+    font-size: 11px;
+    color: var(--text-hint);
+    text-align: center;
+    padding: 8px 0;
+  }
+
+  @media (max-width: 480px) {
+    body { padding: 14px 10px 32px; }
+    .matrix { min-height: 380px; gap: 6px; }
+    .zone { padding: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>タスクマトリクス</h1>
+<p class="subtitle">やることを整理して、頭をスッキリさせよう</p>
+
+<div class="h-axis">
+  <span class="axis-label">時間がかかる</span>
+  <div class="axis-line left" style="flex:1"></div>
+  <div class="axis-line right" style="flex:1"></div>
+  <span class="axis-label">すぐ終わる</span>
+</div>
+
+<div class="layout">
+  <div class="v-axis-col">
+    <span class="v-label">自分でできる</span>
+    <div class="v-axis-line"></div>
+    <span class="v-label">他者も関わる</span>
+  </div>
+  <div class="matrix" id="matrix"></div>
+</div>
+
+<div class="deposit-box">
+  <div class="deposit-title">預けるボックス</div>
+  <div class="deposit-sub">今やらなくていいもの</div>
+  <div class="deposit-items" id="deposit-items"></div>
+  <div class="deposit-add">
+    <input class="deposit-input" id="deposit-input" type="text" placeholder="メモを追加...">
+    <button class="deposit-add-btn" onclick="addDeposit()">追加</button>
+  </div>
+</div>
+
+<script>
+const zones = [
+  { id:'tl', no:'ゾーン２', desc:'自分・時間がかかる', cls:'zone-z2' },
+  { id:'tr', no:'ゾーン１', desc:'自分・すぐ終わる',   cls:'zone-z1' },
+  { id:'bl', no:'ゾーン４', desc:'他者・時間がかかる', cls:'zone-z4' },
+  { id:'br', no:'ゾーン３', desc:'他者・すぐ終わる',   cls:'zone-z3' },
+];
+
+const KEY = 'task_matrix_app_v1';
+let state = {};
+zones.forEach(z => state[z.id] = []);
+state.deposit = [];
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {}
+}
+function load() {
+  try {
+    const d = localStorage.getItem(KEY);
+    if (d) state = JSON.parse(d);
+    zones.forEach(z => { if (!state[z.id]) state[z.id] = []; });
+    if (!state.deposit) state.deposit = [];
+  } catch(e) {}
+}
+load();
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderZone(z) {
+  const container = document.getElementById('items-' + z.id);
+  container.innerHTML = '';
+  const items = state[z.id] || [];
+  if (items.length === 0) {
+    container.innerHTML = '<div class="empty-hint">メモなし</div>';
+    return;
+  }
+  items.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'memo-item';
+    row.innerHTML = `<input type="checkbox" class="memo-check" ${item.done ? 'checked' : ''} onchange="toggle('${z.id}',${i})">` +
+      `<span class="memo-text${item.done ? ' done' : ''}">${esc(item.text)}</span>` +
+      `<span class="memo-del" onclick="del('${z.id}',${i})" title="削除">×</span>`;
+    container.appendChild(row);
+  });
+}
+
+function renderAll() {
+  zones.forEach(z => renderZone(z));
+  renderDeposit();
+}
+
+function renderDeposit() {
+  const c = document.getElementById('deposit-items');
+  c.innerHTML = '';
+  const items = state.deposit || [];
+  if (items.length === 0) {
+    c.innerHTML = '<div class="empty-hint">まだ何もありません</div>';
+    return;
+  }
+  items.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'deposit-item';
+    row.innerHTML = `<input type="checkbox" class="memo-check" ${item.done ? 'checked' : ''} onchange="toggleDep(${i})">` +
+      `<span class="memo-text${item.done ? ' done' : ''}" style="font-size:12px">${esc(item.text)}</span>` +
+      `<span class="memo-del" onclick="delDep(${i})" title="削除">×</span>`;
+    c.appendChild(row);
+  });
+}
+
+// Build matrix DOM once
+function buildMatrix() {
+  const matrix = document.getElementById('matrix');
+  matrix.innerHTML = '';
+  zones.forEach(z => {
+    const div = document.createElement('div');
+    div.className = 'zone ' + z.cls;
+    div.innerHTML =
+      `<div class="zone-header">` +
+        `<div class="zone-num">${z.no}</div>` +
+        `<div class="zone-desc">（${z.desc}）</div>` +
+      `</div>` +
+      `<div class="items" id="items-${z.id}"></div>` +
+      `<div class="add-row">` +
+        `<input class="add-input" id="input-${z.id}" type="text" placeholder="メモを追加...">` +
+        `<button class="add-btn" onclick="addMemo('${z.id}')" title="追加">+</button>` +
+      `</div>`;
+    matrix.appendChild(div);
+    document.getElementById('input-' + z.id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') addMemo(z.id);
+    });
+  });
+}
+
+function addMemo(zid) {
+  const inp = document.getElementById('input-' + zid);
+  const t = inp.value.trim();
+  if (!t) return;
+  if (!state[zid]) state[zid] = [];
+  state[zid].push({ text: t, done: false });
+  inp.value = '';
+  save();
+  const z = zones.find(z => z.id === zid);
+  renderZone(z);
+}
+
+function toggle(zid, i) {
+  state[zid][i].done = !state[zid][i].done;
+  save();
+  const z = zones.find(z => z.id === zid);
+  renderZone(z);
+}
+
+function del(zid, i) {
+  state[zid].splice(i, 1);
+  save();
+  const z = zones.find(z => z.id === zid);
+  renderZone(z);
+}
+
+function addDeposit() {
+  const inp = document.getElementById('deposit-input');
+  const t = inp.value.trim();
+  if (!t) return;
+  state.deposit.push({ text: t, done: false });
+  inp.value = '';
+  save();
+  renderDeposit();
+}
+
+function toggleDep(i) {
+  state.deposit[i].done = !state.deposit[i].done;
+  save();
+  renderDeposit();
+}
+
+function delDep(i) {
+  state.deposit.splice(i, 1);
+  save();
+  renderDeposit();
+}
+
+document.getElementById('deposit-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addDeposit();
+});
+
+buildMatrix();
+renderAll();
+</script>
+</body>
+</html>
